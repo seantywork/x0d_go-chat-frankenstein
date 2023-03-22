@@ -1,0 +1,23 @@
+version: "3"
+
+services:
+
+        webph:
+                build: ./gogin
+                container_name: webph
+                ports:
+                        - "8080:8080"
+               
+        trafficph:
+                build: ./nginx
+                container_name: trafficph
+                ports:
+                        - "5006:5006"
+
+                depends_on:
+
+                        - webph
+               
+
+
+
