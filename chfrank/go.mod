@@ -1,4 +1,4 @@
-module chatfranken/sio
+module chatfrankenstein/chfrank
 
 go 1.19
 
