@@ -3,10 +3,24 @@ version: "3"
 services:
 
         webph:
-                build: ./gogin
+                build: ./gin
                 container_name: webph
                 ports:
-                        - "8080:8080"
+                        - "8888:8888"
+
+        sockph:
+                build: ./sio
+                container_name: sockph
+                ports:
+                        - "8889:8889"
+
+        dbph:
+                build: ./mysql
+                container_name: dbph
+                ports:
+                        - "3306:3306"
+
+          
                
         trafficph:
                 build: ./nginx
@@ -14,9 +28,7 @@ services:
                 ports:
                         - "5006:5006"
 
-                depends_on:
 
-                        - webph
                
 
 

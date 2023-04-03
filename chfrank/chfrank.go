@@ -54,7 +54,7 @@ func main() {
 	fmt.Println("PW: ")
 	fmt.Scanln(&pw)
 
-	done := make(chan struct{})
+	done := make(chan int)
 
 	go func() {
 		defer close(done)
@@ -145,7 +145,7 @@ func main() {
 	}
 	defer c.Close()
 
-	done = make(chan struct{})
+	done = make(chan int)
 
 	go func() {
 		defer close(done)

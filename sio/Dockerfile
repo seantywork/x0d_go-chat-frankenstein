@@ -5,6 +5,6 @@ ENV GIN_MODE=release
 
 COPY . .
 
-EXPOSE 8888
+EXPOSE 8889
 
-CMD ["./gin"]
+CMD ["./sio"]
