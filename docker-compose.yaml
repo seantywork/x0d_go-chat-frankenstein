@@ -2,17 +2,6 @@ version: "3"
 
 services:
 
-        webph:
-                build: ./gin
-                container_name: webph
-                ports:
-                        - "8888:8888"
-
-        sockph:
-                build: ./sio
-                container_name: sockph
-                ports:
-                        - "8889:8889"
 
         dbph:
                 build: ./mysql
@@ -22,12 +11,6 @@ services:
 
           
                
-        trafficph:
-                build: ./nginx
-                container_name: trafficph
-                ports:
-                        - "5006:5006"
-
 
                
 
