@@ -7,7 +7,50 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
+
+	"database/sql"
+
+	_ "github.com/go-sql-driver/mysql"
 )
+
+type user_data struct {
+	DATA []user_record
+}
+
+type user_record struct {
+	UUID    string
+	USER_ID string
+	USER_PW string
+	ACTIVE  int
+}
+
+func dbQuery(query string, args []string) (interface{}, error) {
+
+	db, err := sql.Open("mysql", "seantywork:youdonthavetoknow@tcp(127.0.0.1:3306)/chfrank")
+
+	if err != nil {
+		return -1, err
+	}
+
+	for i := 0; i < len(args); i++ {
+
+		query = strings.Replace(query, "?", args[i], 1)
+
+	}
+
+	defer db.Close()
+
+	results, err := db.Query(query)
+
+	if err != nil {
+
+		return 1, err
+
+	}
+
+	return results, err
+
+}
 
 var addr = flag.String("addr", "localhost:8889", "http service address")
 

@@ -19,9 +19,9 @@ INSERT INTO chfrank_user(uuid, usid, user_id, user_pw, ACTIVE) values('b03b60674
 
 INSERT INTO chfrank_user(uuid, usid, user_id, user_pw, ACTIVE) values('141f84d83505dc2261ebadf1f6424a72','N','test2','test2', 1);
 
-INSERT INTO chfrank_channel (cuid, channel_name, channel_passphrase, ACTIVE) values('0f398445adddc9590a1fa44ada00dadc','test_chan1','N',1)
+INSERT INTO chfrank_channel (cuid, channel_name, channel_passphrase, ACTIVE) values('0f398445adddc9590a1fa44ada00dadc','test_chan1','N',1);
 
-INSERT INTO chfrank_channel (cuid, channel_name, channel_passphrase, ACTIVE) values('564e07aa11f709dd6685ff7dc9aa3f53','test_chan2','secretchannel',1)
+INSERT INTO chfrank_channel (cuid, channel_name, channel_passphrase, ACTIVE) values('564e07aa11f709dd6685ff7dc9aa3f53','test_chan2','secretchannel',1);
 
 
 
