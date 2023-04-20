@@ -52,9 +52,9 @@ func main() {
 
 	var result_rows *sql.Rows
 
-	q := "SELECT * FROM chfrank_user WHERE user_id LIKE '%?%'"
+	q := "SELECT uuid, usid, user_pw FROM chfrank_user WHERE ACTIVE = 1 AND user_id = '?'"
 
-	a := []string{"test"}
+	a := []string{"test1"}
 
 	res, err := dbQuery(q, a)
 
@@ -69,7 +69,7 @@ func main() {
 	for result_rows.Next() {
 		var record user_record
 
-		err = result_rows.Scan(&record.UUID, &record.USID, &record.USER_ID, &record.USER_PW, &record.ACTIVE)
+		err = result_rows.Scan(&record.UUID, &record.USID, &record.USER_PW)
 		if err != nil {
 			panic(err.Error())
 		}
