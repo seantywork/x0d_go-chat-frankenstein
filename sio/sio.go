@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -12,9 +13,11 @@ import (
 
 	"database/sql"
 
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+
 	_ "github.com/go-sql-driver/mysql"
-	//	"crypto/sha256"
-	// "encoding/hex"
 )
 
 type user_data struct {
@@ -57,6 +60,64 @@ func dbQuery(query string, args []string) (interface{}, error) {
 
 }
 
+func randomHex(n int) (string, error) {
+	bytes := make([]byte, n)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+func usidChecker(session *sessions.Session) int {
+
+	session_val := session.Values["usid"]
+
+	str_session_val, okay := session_val.(string)
+
+	if okay == false {
+
+		return -2
+
+	}
+
+	q := "SELECT uuid, usid, user_pw FROM chfrank_user WHERE ACTIVE = 1 AND usid = '?'"
+
+	a := []string{str_session_val}
+
+	res, err := dbQuery(q, a)
+
+	if err != nil {
+
+		return -1
+
+	}
+
+	result_rows := res.(*sql.Rows)
+
+	var ud user_data
+
+	for result_rows.Next() {
+		var ur user_record
+
+		err = result_rows.Scan(&ur.UUID, &ur.USID, &ur.USER_PW)
+		if err != nil {
+			panic(err.Error())
+		}
+
+		ud.DATA = append(ud.DATA, ur)
+
+	}
+
+	if len(ud.DATA) != 1 {
+
+		return 1
+
+	}
+
+	return 0
+
+}
+
 var addr = flag.String("addr", "localhost:8889", "http service address")
 
 var upgrader = websocket.Upgrader{} // use default options
@@ -85,29 +146,40 @@ func echo(w http.ResponseWriter, r *http.Request) {
 
 func auth(w http.ResponseWriter, r *http.Request) {
 
-	store := sessions.NewFilesystemStore("./sio_session", []byte("sio-test-key"))
-
-	session, _ := store.Get(r, "sio-test-name")
-
-	session.Values["what"] = "thehell"
-
-	_ = session.Save(r, w)
-
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Print("upgrade:", err)
 		return
 	}
+
+	ret_code := "DEAD"
+
+	store := sessions.NewFilesystemStore("./sio_session", []byte("sio-test-key"))
+
+	session, _ := store.Get(r, "sio-test-name")
+
+	usid_code := usidChecker(session)
+
+	fmt.Println(usid_code)
+
+	if usid_code == 0 {
+
+		err = c.WriteMessage(websocket.TextMessage, []byte("ALIVE"))
+		if err != nil {
+			log.Println("write:", err)
+			return
+		}
+
+	}
+
 	defer c.Close()
 	for {
 		mt, message, err := c.ReadMessage()
 		if err != nil {
 			log.Println("read:", err)
-			break
+			return
 		}
 		str_message := string(message)
-
-		ret_code := "DEAD"
 
 		cred_list := strings.Split(str_message, ":")
 
@@ -115,13 +187,13 @@ func auth(w http.ResponseWriter, r *http.Request) {
 
 		upw := cred_list[1]
 
-		//sha_256 := sha256.New()
+		sha_256 := sha256.New()
 
-		//sha_256.Write([]byte(upw))
+		sha_256.Write([]byte(upw))
 
-		//pw_checksum_byte := sha_256.Sum(nil)
+		pw_checksum_byte := sha_256.Sum(nil)
 
-		//pw_checksum_hex := hex.EncodeToString(pw_checksum_byte)
+		pw_checksum_hex := hex.EncodeToString(pw_checksum_byte)
 
 		q := "SELECT uuid, usid, user_pw FROM chfrank_user WHERE ACTIVE = 1 AND user_id = '?'"
 
@@ -134,7 +206,7 @@ func auth(w http.ResponseWriter, r *http.Request) {
 			err = c.WriteMessage(mt, []byte(ret_code))
 			if err != nil {
 				log.Println("write:", err)
-				continue
+				return
 			}
 
 		}
@@ -160,20 +232,36 @@ func auth(w http.ResponseWriter, r *http.Request) {
 			err = c.WriteMessage(mt, []byte(ret_code))
 			if err != nil {
 				log.Println("write:", err)
-				continue
+				return
 			}
 
 		}
 
-		//if ud.DATA[0].USER_PW == pw_checksum_hex {
-
-		//	ret_code = "ALIVE"
-
-		//}
-
-		if ud.DATA[0].USER_PW == upw {
+		if ud.DATA[0].USER_PW == pw_checksum_hex {
 
 			ret_code = "ALIVE"
+
+			new_session_val, _ := randomHex(16)
+
+			q := "UPDATE chfrank_user SET usid = '?' WHERE ACTIVE = 1 AND uuid = '?'"
+
+			a := []string{new_session_val, ud.DATA[0].UUID}
+
+			_, err = dbQuery(q, a)
+
+			if err != nil {
+
+				err = c.WriteMessage(mt, []byte("DEAD"))
+				if err != nil {
+					log.Println("write:", err)
+					return
+				}
+
+			}
+
+			session.Values["usid"] = new_session_val
+
+			_ = session.Save(r, w)
 
 		}
 
