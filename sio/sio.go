@@ -19,17 +19,23 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-type user_data struct {
-	DATA []user_record
+type UserData struct {
+	DATA []UserRecord
 }
 
-type user_record struct {
+type UserRecord struct {
 	UUID    string
 	USID    string
 	USER_ID string
 	USER_PW string
 	ACTIVE  int
 }
+
+var ADDR = flag.String("addr", "localhost:8889", "http service address")
+
+var UPGRADER = websocket.Upgrader{} // use default options
+
+var UID_CONNECTION = make(map[string]*websocket.Conn)
 
 func dbQuery(query string, args []string) (interface{}, error) {
 
@@ -67,7 +73,7 @@ func randomHex(n int) (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-func usidChecker(session *sessions.Session) int {
+func usidChecker(session *sessions.Session) (string, int) {
 
 	session_val := session.Values["usid"]
 
@@ -75,7 +81,7 @@ func usidChecker(session *sessions.Session) int {
 
 	if okay == false {
 
-		return 0
+		return "", 0
 
 	}
 
@@ -87,16 +93,16 @@ func usidChecker(session *sessions.Session) int {
 
 	if err != nil {
 
-		return -2
+		return "", -2
 
 	}
 
 	result_rows := res.(*sql.Rows)
 
-	var ud user_data
+	var ud UserData
 
 	for result_rows.Next() {
-		var ur user_record
+		var ur UserRecord
 
 		err = result_rows.Scan(&ur.UUID, &ur.USID, &ur.USER_PW)
 		if err != nil {
@@ -109,25 +115,37 @@ func usidChecker(session *sessions.Session) int {
 
 	if len(ud.DATA) != 1 {
 
-		return -1
+		return "", -1
 
 	}
 
-	return 1
+	return ud.DATA[0].UUID, 1
 
 }
 
-func Auth(w http.ResponseWriter, r *http.Request, message []byte) int {
+func Auth(w http.ResponseWriter, r *http.Request, c *websocket.Conn, message []byte) int {
 
 	store := sessions.NewFilesystemStore("./sio_session", []byte("sio-test-key"))
 
 	session, _ := store.Get(r, "sio-test-name")
 
-	usid_code := usidChecker(session)
+	uuid_key, usid_code := usidChecker(session)
 
 	log.Println("auth session: ", usid_code)
 
 	if usid_code == 1 {
+
+		if old_c, okay := UID_CONNECTION[uuid_key]; okay {
+
+			_ = old_c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "Old Connection Close"))
+
+			UID_CONNECTION[uuid_key] = c
+
+		} else {
+
+			UID_CONNECTION[uuid_key] = c
+
+		}
 
 		return usid_code
 
@@ -173,10 +191,10 @@ func Auth(w http.ResponseWriter, r *http.Request, message []byte) int {
 
 	result_rows := res.(*sql.Rows)
 
-	var ud user_data
+	var ud UserData
 
 	for result_rows.Next() {
-		var ur user_record
+		var ur UserRecord
 
 		err = result_rows.Scan(&ur.UUID, &ur.USID, &ur.USER_PW)
 		if err != nil {
@@ -209,9 +227,23 @@ func Auth(w http.ResponseWriter, r *http.Request, message []byte) int {
 
 		}
 
+		uuid_key = ud.DATA[0].UUID
+
 		session.Values["usid"] = new_session_val
 
 		_ = session.Save(r, w)
+
+		if old_c, okay := UID_CONNECTION[uuid_key]; okay {
+
+			_ = old_c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "Old Connection Close"))
+
+			UID_CONNECTION[uuid_key] = c
+
+		} else {
+
+			UID_CONNECTION[uuid_key] = c
+
+		}
 
 		return 1
 
@@ -221,12 +253,8 @@ func Auth(w http.ResponseWriter, r *http.Request, message []byte) int {
 
 }
 
-var addr = flag.String("addr", "localhost:8889", "http service address")
-
-var upgrader = websocket.Upgrader{} // use default options
-
 func echo(w http.ResponseWriter, r *http.Request) {
-	c, err := upgrader.Upgrade(w, r, nil)
+	c, err := UPGRADER.Upgrade(w, r, nil)
 	if err != nil {
 		log.Print("upgrade:", err)
 		return
@@ -251,7 +279,7 @@ func access(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Access")
 
-	c, err := upgrader.Upgrade(w, r, nil)
+	c, err := UPGRADER.Upgrade(w, r, nil)
 	if err != nil {
 		log.Print("upgrade:", err)
 		return
@@ -265,7 +293,7 @@ func access(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		auth_code := Auth(w, r, message)
+		auth_code := Auth(w, r, c, message)
 
 		if auth_code != 1 {
 
@@ -314,10 +342,97 @@ func access(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func srv_message(w http.ResponseWriter, r *http.Request) {
+
+	log.Println("Server Access")
+	log.Printf("UID_CONN : %d", len(UID_CONNECTION))
+
+	c, err_up := UPGRADER.Upgrade(w, r, nil)
+	if err_up != nil {
+		log.Print("upgrade:", err_up)
+		return
+	}
+
+	defer c.Close()
+
+	var mt int
+	var message []byte
+	var err error
+
+	for {
+		mt, message, err = c.ReadMessage()
+		if err != nil {
+			log.Println("read:", err)
+			return
+		}
+
+		str_message := string(message)
+
+		if str_message != "imtheserver" {
+
+			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "Connection Close"))
+			if err != nil {
+				log.Println("write close:", err)
+				return
+			}
+
+			return
+
+		} else {
+			break
+		}
+
+	}
+
+	err = c.WriteMessage(mt, []byte("READY"))
+	if err != nil {
+		log.Println("write:", err)
+		return
+	}
+
+	for {
+		mt_read, message_read, err_read := c.ReadMessage()
+		if err_read != nil {
+			log.Println("read:", err_read)
+			return
+		}
+		log.Printf("recv: %s", message_read)
+
+		str_message := string(message_read)
+
+		if user_c, okay := UID_CONNECTION[str_message]; okay {
+
+			err_read = user_c.WriteMessage(mt_read, []byte("Server is saying hello"))
+			if err_read != nil {
+				log.Println("write:", err_read)
+				return
+			}
+
+			err_read = c.WriteMessage(mt_read, []byte("SUCCESS"))
+			if err != nil {
+				log.Println("write:", err)
+				return
+			}
+
+		} else {
+
+			err_read = c.WriteMessage(mt_read, []byte("NOSESSION"))
+			if err != nil {
+				log.Println("write:", err)
+				return
+			}
+
+		}
+
+	}
+
+}
+
 func main() {
 	flag.Parse()
 	log.SetFlags(0)
 	http.HandleFunc("/enter", echo)
 	http.HandleFunc("/access", access)
-	log.Fatal(http.ListenAndServe(*addr, nil))
+	http.HandleFunc("/serverside-message", srv_message)
+	log.Fatal(http.ListenAndServe(*ADDR, nil))
 }

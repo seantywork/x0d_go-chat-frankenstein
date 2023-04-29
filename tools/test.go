@@ -49,32 +49,63 @@ func dbQuery(query string, args []string) (interface{}, error) {
 }
 
 func main() {
+	/*
+		var result_rows *sql.Rows
 
-	var result_rows *sql.Rows
+		q := "SELECT uuid, usid, user_pw FROM chfrank_user WHERE ACTIVE = 1 AND user_id = '?'"
 
-	q := "SELECT uuid, usid, user_pw FROM chfrank_user WHERE ACTIVE = 1 AND user_id = '?'"
+		a := []string{"test1"}
 
-	a := []string{"test1"}
+		res, err := dbQuery(q, a)
 
-	res, err := dbQuery(q, a)
+		if err != nil {
 
-	if err != nil {
+			panic(err.Error())
 
-		panic(err.Error())
+		}
+
+		result_rows = res.(*sql.Rows)
+
+		for result_rows.Next() {
+			var record user_record
+
+			err = result_rows.Scan(&record.UUID, &record.USID, &record.USER_PW)
+			if err != nil {
+				panic(err.Error())
+			}
+
+			fmt.Println(record.UUID + " " + record.USER_ID + " " + record.USER_PW)
+
+		}
+	*/
+
+	test := make(map[string]string)
+
+	if _, okay := test["check"]; okay {
+
+		fmt.Println("override")
+
+		test["check"] = "override"
+
+	} else {
+
+		fmt.Println("added")
+
+		test["check"] = "new"
 
 	}
 
-	result_rows = res.(*sql.Rows)
+	if _, okay := test["check"]; okay {
 
-	for result_rows.Next() {
-		var record user_record
+		fmt.Println("override")
 
-		err = result_rows.Scan(&record.UUID, &record.USID, &record.USER_PW)
-		if err != nil {
-			panic(err.Error())
-		}
+		test["check"] = "override"
 
-		fmt.Println(record.UUID + " " + record.USER_ID + " " + record.USER_PW)
+	} else {
+
+		fmt.Println("added")
+
+		test["check"] = "new"
 
 	}
 
