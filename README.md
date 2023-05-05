@@ -1,6 +1,6 @@
 # Page
 
-[Visit Site](https://seantywork.github.io/x0d_go-chat-frankenstein)
+[Visit Site](https://seantywork.github.io/docs/x0d)
 
 # go-chat-frankenstein
 
