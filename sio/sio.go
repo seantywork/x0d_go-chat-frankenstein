@@ -409,9 +409,26 @@ func srv_message(w http.ResponseWriter, r *http.Request) {
 
 		if user_c, okay := UID_CONNECTION[str_message]; okay {
 
-			if _, okay = SRV_CONNECTION[str_message]; !okay {
+			if _, okay := SRV_CONNECTION[str_message]; !okay {
 				SRV_CONNECTION[str_message] = c
 				log.Println("Connection added")
+			} else if srv_c, okay := SRV_CONNECTION[str_message]; okay {
+
+				if c != srv_c {
+					err = srv_c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "Connection Close"))
+					if err != nil {
+						log.Println("write close:", err)
+						return
+					}
+					SRV_CONNECTION[str_message] = c
+					log.Println("Connection overwritten")
+
+				} else {
+
+					log.Println("Connection persistent")
+
+				}
+
 			}
 
 			err_read = user_c.WriteMessage(mt_read, []byte("Server is saying hello"))
