@@ -37,6 +37,8 @@ var UPGRADER = websocket.Upgrader{} // use default options
 
 var UID_CONNECTION = make(map[string]*websocket.Conn)
 
+var SRV_CONNECTION = make(map[string]*websocket.Conn)
+
 func dbQuery(query string, args []string) (interface{}, error) {
 
 	db, err := sql.Open("mysql", "seantywork:youdonthavetoknow@tcp(127.0.0.1:3306)/chfrank")
@@ -346,6 +348,9 @@ func srv_message(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Server Access")
 	log.Printf("UID_CONN : %d", len(UID_CONNECTION))
+	log.Printf("SRV_CONN : %d", len(SRV_CONNECTION))
+
+	UPGRADER.CheckOrigin = func(r *http.Request) bool { return true }
 
 	c, err_up := UPGRADER.Upgrade(w, r, nil)
 	if err_up != nil {
@@ -384,6 +389,8 @@ func srv_message(w http.ResponseWriter, r *http.Request) {
 
 	}
 
+	log.Println("Validation Success")
+
 	err = c.WriteMessage(mt, []byte("READY"))
 	if err != nil {
 		log.Println("write:", err)
@@ -401,6 +408,11 @@ func srv_message(w http.ResponseWriter, r *http.Request) {
 		str_message := string(message_read)
 
 		if user_c, okay := UID_CONNECTION[str_message]; okay {
+
+			if _, okay = SRV_CONNECTION[str_message]; !okay {
+				SRV_CONNECTION[str_message] = c
+				log.Println("Connection added")
+			}
 
 			err_read = user_c.WriteMessage(mt_read, []byte("Server is saying hello"))
 			if err_read != nil {

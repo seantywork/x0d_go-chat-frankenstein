@@ -1,0 +1,56 @@
+<!DOCTYPE HTML>
+
+<html>
+   <head>
+      
+      <script type = "text/javascript">   
+      
+      
+        function WebSocketTest() {
+        
+            if ("WebSocket" in window) {
+
+                alert("WebSocket is supported by your Browser!")
+                
+                var ws = new WebSocket("ws://localhost:8889/serverside-message")
+                
+                ws.onopen = function() {
+                    alert("Validation will be sent...")
+                    ws.send("imtheserver")
+                    
+                
+                }
+                
+                ws.onmessage = function (evt) { 
+                    var received_msg = evt.data;
+                    
+                    if (received_msg == 'READY'){
+                        alert("Sending key...");
+                        ws.send("b03b606740340d6f50128c0a81c40390")      
+                    } else {
+                        alert("Message received");
+                        alert(received_msg)
+                    }
+                };
+                
+                ws.onclose = function() { 
+
+                    alert("Connection is closed..."); 
+                };
+            } else {
+                
+                alert("WebSocket NOT supported by your Browser!");
+
+            }
+        }
+      </script>
+		
+   </head>
+   
+   <body>
+      <div id = "sse">
+         <a href = "javascript:WebSocketTest()">Run WebSocket</a>
+      </div>
+      
+   </body>
+</html>
