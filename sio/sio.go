@@ -39,7 +39,7 @@ var UID_CONNECTION = make(map[string]*websocket.Conn)
 
 var SRV_CONNECTION = make(map[string]*websocket.Conn)
 
-func dbQuery(query string, args []string) (interface{}, error) {
+func dbQuery(query string, args []any) (interface{}, error) {
 
 	db, err := sql.Open("mysql", "seantywork:youdonthavetoknow@tcp(127.0.0.1:3306)/chfrank")
 
@@ -47,15 +47,9 @@ func dbQuery(query string, args []string) (interface{}, error) {
 		return -1, err
 	}
 
-	for i := 0; i < len(args); i++ {
-
-		query = strings.Replace(query, "?", args[i], 1)
-
-	}
-
 	defer db.Close()
 
-	results, err := db.Query(query)
+	results, err := db.Query(query, args[0:]...)
 
 	if err != nil {
 
@@ -87,9 +81,9 @@ func usidChecker(session *sessions.Session) (string, int) {
 
 	}
 
-	q := "SELECT uuid, usid, user_pw FROM chfrank_user WHERE ACTIVE = 1 AND usid = '?'"
+	q := "SELECT uuid, usid, user_pw FROM chfrank_user WHERE ACTIVE = 1 AND usid = ?"
 
-	a := []string{str_session_val}
+	a := []any{str_session_val}
 
 	res, err := dbQuery(q, a)
 
@@ -179,9 +173,9 @@ func Auth(w http.ResponseWriter, r *http.Request, c *websocket.Conn, message []b
 
 	pw_checksum_hex := hex.EncodeToString(pw_checksum_byte)
 
-	q := "SELECT uuid, usid, user_pw FROM chfrank_user WHERE ACTIVE = 1 AND user_id = '?'"
+	q := "SELECT uuid, usid, user_pw FROM chfrank_user WHERE ACTIVE = 1 AND user_id = ?"
 
-	a := []string{uid}
+	a := []any{uid}
 
 	res, err := dbQuery(q, a)
 
@@ -217,9 +211,9 @@ func Auth(w http.ResponseWriter, r *http.Request, c *websocket.Conn, message []b
 
 		new_session_val, _ := randomHex(16)
 
-		q := "UPDATE chfrank_user SET usid = '?' WHERE ACTIVE = 1 AND uuid = '?'"
+		q := "UPDATE chfrank_user SET usid = ? WHERE ACTIVE = 1 AND uuid = ?"
 
-		a := []string{new_session_val, ud.DATA[0].UUID}
+		a := []any{new_session_val, ud.DATA[0].UUID}
 
 		_, err = dbQuery(q, a)
 
