@@ -4,7 +4,9 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -39,21 +41,24 @@ var UID_CONNECTION = make(map[string]*websocket.Conn)
 
 var SRV_CONNECTION = make(map[string]*websocket.Conn)
 
-func dbQuery(query string, args []any) (interface{}, error) {
+var L = log.New(os.Stdout, "", 0)
 
-	db, err := sql.Open("mysql", "seantywork:youdonthavetoknow@tcp(127.0.0.1:3306)/chfrank")
+func eventLogger(msg string) {
+	L.SetPrefix(time.Now().UTC().Format("2006-01-02 15:04:05.000") + " [INFO] ")
+	L.Print(msg)
+}
+
+var DB *sql.DB
+
+func dbQuery(query string, args []any) (*sql.Rows, error) {
+
+	var empty_rows *sql.Rows
+
+	results, err := DB.Query(query, args[0:]...)
 
 	if err != nil {
-		return -1, err
-	}
 
-	defer db.Close()
-
-	results, err := db.Query(query, args[0:]...)
-
-	if err != nil {
-
-		return 1, err
+		return empty_rows, err
 
 	}
 
@@ -71,6 +76,9 @@ func randomHex(n int) (string, error) {
 
 func usidChecker(session *sessions.Session) (string, int) {
 
+	var res *sql.Rows
+	var err error
+
 	session_val := session.Values["usid"]
 
 	str_session_val, okay := session_val.(string)
@@ -85,7 +93,7 @@ func usidChecker(session *sessions.Session) (string, int) {
 
 	a := []any{str_session_val}
 
-	res, err := dbQuery(q, a)
+	res, err = dbQuery(q, a)
 
 	if err != nil {
 
@@ -93,14 +101,14 @@ func usidChecker(session *sessions.Session) (string, int) {
 
 	}
 
-	result_rows := res.(*sql.Rows)
-
 	var ud UserData
 
-	for result_rows.Next() {
+	defer res.Close()
+
+	for res.Next() {
 		var ur UserRecord
 
-		err = result_rows.Scan(&ur.UUID, &ur.USID, &ur.USER_PW)
+		err = res.Scan(&ur.UUID, &ur.USID, &ur.USER_PW)
 		if err != nil {
 			panic(err.Error())
 		}
@@ -185,14 +193,12 @@ func Auth(w http.ResponseWriter, r *http.Request, c *websocket.Conn, message []b
 
 	}
 
-	result_rows := res.(*sql.Rows)
-
 	var ud UserData
 
-	for result_rows.Next() {
+	for res.Next() {
 		var ur UserRecord
 
-		err = result_rows.Scan(&ur.UUID, &ur.USID, &ur.USER_PW)
+		err = res.Scan(&ur.UUID, &ur.USID, &ur.USER_PW)
 		if err != nil {
 			panic(err.Error())
 		}
@@ -452,6 +458,23 @@ func srv_message(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+
+	var err error
+
+	DB, err = sql.Open("mysql", "seantywork:youdonthavetoknow@tcp(127.0.0.1:3306)/chfrank")
+
+	if err != nil {
+
+		eventLogger("DB connection failed")
+		return
+
+	}
+
+	DB.SetConnMaxLifetime(time.Second * 10)
+	DB.SetConnMaxIdleTime(time.Second * 5)
+	DB.SetMaxOpenConns(10)
+	DB.SetMaxIdleConns(10)
+
 	flag.Parse()
 	log.SetFlags(0)
 	http.HandleFunc("/enter", echo)
